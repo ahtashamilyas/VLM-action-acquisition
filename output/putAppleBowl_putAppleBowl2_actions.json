@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_description": "robot putting an apple in a bowl",
+  "source_video": "putAppleBowl_putAppleBowl2",
+  "processed_at": "2026-03-27T21:10:57.426373+00:00",
+  "total_frames": 231,
+  "duration_s": 7.7,
+  "action_sequence": [
+    {
+      "id": 0,
+      "segment_id": 0,
+      "action_core": "PICK_AND_PLACE",
+      "sub_action": "transport",
+      "start_time_s": 0.0,
+      "end_time_s": 76.667,
+      "duration_s": 76.667,
+      "objects_involved": [
+        "apple",
+        "bowl"
+      ],
+      "contact_type": "grasp",
+      "spatial_relation": "in bowl",
+      "depth_context": "apple in top-center of depth grid, constant height",
+      "confidence": 0.95,
+      "reasoning": "['1) The object visible is an apple.', '2) The gripper/end-effector is holding the apple and transporting it to a bowl.', '3) The depth context reveals that the apple is in the top-center of the depth grid, indicating it is in a constant height position above the bowl.']"
+    }
+  ],
+  "summary": {
+    "total_actions": 1,
+    "action_counts": {
+      "PICK_AND_PLACE": 1
+    },
+    "mean_confidence": 0.95,
+    "coverage_s": 76.667,
+    "low_confidence_segments": []
+  }
+}
