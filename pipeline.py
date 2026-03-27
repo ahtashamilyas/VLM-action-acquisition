@@ -1,24 +1,10 @@
-"""
-REFLECT Pipeline — Main Orchestrator
-======================================
-Full end-to-end pipeline:
-  RGBD frames → Keyframe extraction → VLM (Ollama) → AKG action JSON
-
-Usage:
-  python pipeline.py --video path/to/video.mp4 --depth_dir path/to/depth/
-  python pipeline.py --reflect_data path/to/reflect_data/ --task boilWater
-  python pipeline.py --synthetic --episodes 2          # no real data needed
-"""
-
 import argparse
+import re
 import logging
 import os
 import sys
 from pathlib import Path
-
-# Allow imports from project root
 sys.path.insert(0, str(Path(__file__).parent))
-
 from config import (
     ActionConfig, KeyframeConfig, OllamaConfig, PipelineConfig, RGBDConfig
 )
@@ -26,7 +12,6 @@ from core.rgbd_preprocessing import fuse_rgbd_frame, iter_video_frames, load_rgb
 from core.keyframe_extraction import KeyframeExtractor
 from core.vlm_client import OllamaVLMClient, parse_vlm_response
 from core.action_serializer import save_json, print_summary
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -43,24 +28,10 @@ def run_pipeline(
     source_name: str = "unknown",
     dry_run: bool = False,
 ) -> dict:
-    """
-    Execute the full pipeline on a frame iterator.
-
-    Args:
-        cfg          : PipelineConfig
-        frame_iterator: iterable of (frame_idx, fps, rgb_array, depth_array)
-        source_name  : label for JSON output (e.g. video filename)
-        dry_run      : if True, skip VLM calls (test preprocessing only)
-
-    Returns:
-        dict with the full AKG JSON output
-    """
     log.info(f"Pipeline start — source: {source_name}")
-
     extractor = KeyframeExtractor(cfg.keyframe, depth_scale=cfg.rgbd.depth_scale)
     total_frames = 0
     fps_seen = 30.0
-
     # ── Stage 1 & 2: RGBD Preprocessing + Frame Ingestion ─────────────────
     log.info("Stage 1/3: RGBD preprocessing & keyframe ingestion…")
     for frame_idx, fps, rgb, depth in frame_iterator:
@@ -126,6 +97,26 @@ def run_pipeline(
             except Exception as e:
                 log.error(f"    VLM error on segment {seg_id}: {e}")
 
+    # ── Stage 4: REFLECT Failure Analysis ──────────────────────────────────
+    failure_result = None
+    if not dry_run:
+        try:
+            from core.vlm_client import analyse_failure
+            all_bundles = []
+            for seg_id in range(len(segments)):
+                all_bundles.extend(bundles_by_seg.get(seg_id, []))
+            task_name = re.sub(r"[^a-zA-Z]", "", Path(source_name).stem.split("_")[0])
+            failure_result = analyse_failure(
+                client=OllamaVLMClient(cfg.ollama),
+                episode_id=source_name,
+                task_description=cfg.task_description,
+                task_name=task_name,
+                all_bundles=all_bundles,
+                n_keyframes=3,
+            )
+        except Exception as e:
+            log.error(f"Failure analysis error: {e}")
+
     # ── Output ──────────────────────────────────────────────────────────────
     out_path = os.path.join(
         cfg.output_dir,
@@ -138,6 +129,7 @@ def run_pipeline(
         source_video=source_name,
         total_frames=total_frames,
         video_fps=fps_seen,
+        failure_analysis=failure_result,
     )
     print_summary(data)
     return data
@@ -171,7 +163,11 @@ def main():
     # VLM / pipeline config
     parser.add_argument("--ollama_url", default="http://localhost:11434",
                         help="Ollama server URL (can be OpenWebUI)")
-    parser.add_argument("--model", default="llava:13b",
+    parser.add_argument("--user_id", default="o_yfodc2@uni-bremen.de",
+                        help="Your university email (OpenWebUI login identity)")
+    parser.add_argument("--api_key", default="sk-f7b49d8820cd49f69922e849647d4b32",
+                        help="OpenWebUI API key (sk-xxxx) — get from Settings → Account → API Keys")
+    parser.add_argument("--model", default="openchat:7b",
                         help="Ollama vision model name")
     parser.add_argument("--task_desc", default="a kitchen robot performing a meal preparation task",
                         help="Natural language task description for VLM prompt")
@@ -192,7 +188,12 @@ def main():
 
     # Build config
     cfg = PipelineConfig(
-        ollama=OllamaConfig(base_url=args.ollama_url, model=args.model),
+        ollama=OllamaConfig(
+            base_url=args.ollama_url,
+            user_id=args.user_id,
+            api_key=args.api_key,
+            model=args.model
+        ),
         rgbd=RGBDConfig(depth_strategy=args.depth_strategy),
         keyframe=KeyframeConfig(),
         action=ActionConfig(),
@@ -217,9 +218,7 @@ def main():
     elif args.reflect_data:
         from data.reflect_loader import REFLECTDataset
         dataset = REFLECTDataset(args.reflect_data)
-        for ep in dataset.list_episodes():
-            if args.task and ep.task_name != args.task:
-                continue
+        for ep in dataset.list_episodes(task_filter=args.task):
             cfg.task_description = ep.task_description
             run_pipeline(
                 cfg,
