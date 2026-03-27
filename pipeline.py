@@ -161,11 +161,11 @@ def main():
                         help="Number of synthetic episodes to generate")
 
     # VLM / pipeline config
-    parser.add_argument("--ollama_url", default="HostURLHere",
+    parser.add_argument("--ollama_url", default="http://192.168.200.10:3000",
                         help="Ollama server URL (can be OpenWebUI)")
-    parser.add_argument("--user_id", default="UniversityEmailHere",
+    parser.add_argument("--user_id", default="o_yfodc2@uni-bremen.de",
                         help="Your university email (OpenWebUI login identity)")
-    parser.add_argument("--api_key", default="API_KEY_HERE",
+    parser.add_argument("--api_key", default="sk-f7b49d8820cd49f69922e849647d4b32",
                         help="OpenWebUI API key (sk-xxxx) — get from Settings → Account → API Keys")
     parser.add_argument("--model", default="openchat:7b",
                         help="Ollama vision model name")

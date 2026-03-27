@@ -1,13 +1,5 @@
-"""
-REFLECT Pipeline Configuration
-================================
-Central config for the RGBD → Keyframes → VLM → AKG Actions pipeline.
-"""
-
 from dataclasses import dataclass, field
 from typing import Optional
-
-
 # ── AKG Action Core Taxonomy (Kümpel et al. 2025) ──────────────────────────
 AKG_ACTION_CORES = [
     "CUTTING",
@@ -17,13 +9,12 @@ AKG_ACTION_CORES = [
     "PICK_AND_PLACE",
     "COOK_COOL",
 ]
-
 # ── VLM Backend ─────────────────────────────────────────────────────────────
 @dataclass
 class OllamaConfig:
-    base_url: str = "http://192.168.200.10:3000"   # ← change to your OpenWebUI host
-    user_id: str = "o_yfodc2@uni-bremen.de" 
-    api_key: str = "sk-f7b49d8820cd49f69922e849647d4b32"
+    base_url: str = "URL"   # ← change to your OpenWebUI host
+    user_id: str = "email" 
+    api_key: str = "api_key"
     model: str = "openchat:7b"                    # ← any vision model available in Ollama
     temperature: float = 0.1
     max_tokens: int = 2048

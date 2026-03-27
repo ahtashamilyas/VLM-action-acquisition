@@ -1,3 +1,17 @@
+"""
+VLM Client — Ollama Backend
+============================
+Sends keyframe bundles to an Ollama vision model and parses the response
+into AKG-grounded action records.
+
+Prompt Engineering follows the NVIDIA VLM Prompt Engineering Guide (2025):
+  - Structured system prompt with AKG ontology
+  - Multi-image input (one per keyframe in segment)
+  - Chain-of-thought reasoning before JSON output
+  - Few-shot examples for Action Core disambiguation
+  - Depth grid injected as additional context text
+"""
+
 import json
 import logging
 import re
@@ -147,6 +161,19 @@ def build_user_prompt(
 # ── Ollama API Client ─────────────────────────────────────────────────────────
 
 class OllamaVLMClient:
+    """
+    Client for the university OpenWebUI server.
+
+    Matches the API format from supervisor credentials:
+      - Endpoint : POST {base_url}/api/chat/completions   (OpenAI-compatible)
+      - Auth     : Authorization: <user_id>  (university email, no "Bearer" prefix)
+      - Images   : sent as OpenAI-style content parts inside the user message
+
+    Reference chatbot() function provided by supervisor:
+        headers = {'Authorization': user_id, 'Content-Type': 'application/json'}
+        data    = {"model": model, "messages": [{"role": "user", "content": query}]}
+    """
+
     def __init__(self, cfg: OllamaConfig):
         self.cfg = cfg
         self.endpoint = cfg.chat_endpoint
@@ -158,6 +185,16 @@ class OllamaVLMClient:
         log.info(f"OpenWebUI client → {self.endpoint}  model={cfg.model}  auth={auth_type}")
 
     def _build_messages(self, system_prompt: str, user_text: str, images_b64: list[str]) -> list[dict]:
+        """
+        Build messages for OpenWebUI /api/chat/completions.
+
+        Two formats tried in order (controlled by self.cfg.image_format):
+          "content_parts"  : OpenAI-style [{type:image_url,...},{type:text,...}]
+          "ollama_images"  : Ollama native  {"content": text, "images": [b64, ...]}
+
+        OpenWebUI generally accepts content_parts, but some model backends
+        (especially older llava via Ollama) need the native images field.
+        """
         fmt = getattr(self.cfg, "image_format", "content_parts")
 
         if fmt == "ollama_images":
@@ -185,6 +222,7 @@ class OllamaVLMClient:
             ]
 
     def _call(self, messages: list[dict], retries: int = 2) -> str:
+        """POST to the OpenWebUI /api/chat/completions endpoint."""
         payload = {
             "model": self.cfg.model,
             "messages": messages,
@@ -235,6 +273,10 @@ class OllamaVLMClient:
         task_description: str,
         action_cfg: ActionConfig,
     ) -> str:
+        """
+        Send keyframe images + structured AKG prompt to OpenWebUI/Ollama.
+        Returns raw VLM response string.
+        """
         user_text = build_user_prompt(
             bundles, seg, task_description, action_cfg,
             n_few_shot=action_cfg.few_shot_examples
@@ -248,6 +290,10 @@ class OllamaVLMClient:
         return self._call(messages)
 
     def test_connection(self) -> bool:
+        """
+        Quick connectivity test — sends a plain text message with no images.
+        Call this before running the full pipeline to verify credentials.
+        """
         try:
             payload = {
                 "model": self.cfg.model,
@@ -280,6 +326,10 @@ def parse_vlm_response(
     bundles: list[KeyframeBundle],
     action_cfg: ActionConfig,
 ) -> Optional[AKGAction]:
+    """
+    Parse the raw VLM string into an AKGAction.
+    Handles: clean JSON, JSON embedded in markdown fences, partial JSON.
+    """
     # Strip markdown fences if present
     cleaned = re.sub(r"```(?:json)?", "", raw).strip()
     # Find the first { ... } block

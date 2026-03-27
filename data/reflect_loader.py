@@ -1,23 +1,3 @@
-"""
-REFLECT Dataset Loader
-=======================
-Handles the actual REFLECT dataset structure:
-
-  <data_root>/
-    boilWater1/          <- episode folder (task name + number)
-      videos/
-        color/           <- Zarr array, 4D chunks: frame.0.0.0 (JPEG-XL, uint8)
-        depth/           <- Zarr array, 3D chunks: frame.0.0   (raw uint16)
-        color.mp4        <- fallback RGB video
-      replay_buffer.zarr/
-    boilWater2/
-    sauteeCarrot1/
-    ...
-
-Episode detection: a folder is an episode if its name ends with a digit
-AND contains a "videos/" subdirectory.
-"""
-
 import json
 import logging
 import random
