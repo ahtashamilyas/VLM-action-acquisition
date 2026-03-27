@@ -1,44 +1,3 @@
-"""
-Action Sequence Serializer
-===========================
-Converts a list of AKGAction objects into the final JSON output format,
-optionally enriched with REFLECT-compatible metadata.
-
-Output schema (v1.0):
-{
-  "schema_version": "1.0",
-  "task_description": "...",
-  "source_video": "...",
-  "processed_at": "2026-03-10T...",
-  "total_frames": 1234,
-  "duration_s": 41.1,
-  "action_sequence": [
-    {
-      "id": 0,
-      "segment_id": 0,
-      "action_core": "PICK_AND_PLACE",
-      "sub_action": "transport",
-      "start_time_s": 0.0,
-      "end_time_s": 3.2,
-      "duration_s": 3.2,
-      "objects_involved": ["pot", "stove"],
-      "contact_type": "grasp",
-      "spatial_relation": "above stove",
-      "depth_context": "...",
-      "confidence": 0.91,
-      "reasoning": "..."
-    },
-    ...
-  ],
-  "summary": {
-    "action_counts": {"PICK_AND_PLACE": 3, "CUTTING": 1, ...},
-    "mean_confidence": 0.85,
-    "coverage_s": 38.5,
-    "low_confidence_segments": [...]
-  }
-}
-"""
-
 import json
 import logging
 from datetime import datetime, timezone
@@ -118,6 +77,7 @@ def save_json(
     total_frames: int = 0,
     video_fps: float = 30.0,
     include_reasoning: bool = True,
+    failure_analysis=None,
 ) -> dict:
     """Serialise actions to JSON file and return the dict."""
     data = actions_to_dict(
@@ -128,6 +88,17 @@ def save_json(
         video_fps=video_fps,
         include_reasoning=include_reasoning,
     )
+    if failure_analysis is not None:
+        data["reflect_failure_analysis"] = {
+            "task_succeeded": failure_analysis.task_succeeded,
+            "failure_detected": failure_analysis.failure_detected,
+            "failure_type": failure_analysis.failure_type,
+            "failure_timestep_s": failure_analysis.failure_timestep_s,
+            "failure_description": failure_analysis.failure_description,
+            "objects_final_state": failure_analysis.objects_final_state,
+            "correction_plan": failure_analysis.correction_plan,
+            "confidence": round(failure_analysis.confidence, 4),
+        }
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
@@ -137,11 +108,8 @@ def save_json(
 
 
 def print_summary(data: dict):
-    """Pretty-print the action sequence summary to stdout."""
     s = data["summary"]
-    print("\n" + "═" * 60)
     print("  REFLECT ACTION EXTRACTION RESULTS")
-    print("═" * 60)
     print(f"  Task      : {data['task_description']}")
     print(f"  Source    : {data.get('source_video', 'N/A')}")
     print(f"  Duration  : {data['duration_s']:.1f}s  ({data['total_frames']} frames)")
@@ -156,4 +124,21 @@ def print_summary(data: dict):
               f"conf={a['confidence']:.2f} {bar}")
     if s["low_confidence_segments"]:
         print(f"\n  ⚠  {len(s['low_confidence_segments'])} low-confidence segment(s)")
+    fa = data.get("reflect_failure_analysis")
+    if fa:
+        print()
+        print("  ── REFLECT Failure Analysis ──")
+        if fa["task_succeeded"]:
+            print("  ✓  TASK SUCCEEDED")
+        else:
+            print(f"  ✗  TASK FAILED  [{fa['failure_type']}]")
+            if fa.get("failure_timestep_s"):
+                print(f"     Failure at  : {fa['failure_timestep_s']:.1f}s")
+            print(f"     What happened: {fa['failure_description']}")
+            print(f"     Final state  : {fa['objects_final_state']}")
+            if fa.get("correction_plan"):
+                print("     Correction plan:")
+                for step in fa["correction_plan"]:
+                    print(f"       → {step}")
+        print(f"     Confidence  : {fa['confidence']:.2f}")
     print("═" * 60 + "\n")
