@@ -1,6 +1,6 @@
-/home/student/Desktop/reflect_pipeline/output
-/home/student/Desktop/reflect_pipeline/README.md
-
-/home/student/Desktop/reflect_pipeline/venv
-/home/student/Desktop/reflect_pipeline/tests
-/home/student/Desktop/reflect_pipeline/output
+output/
+real_data/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
