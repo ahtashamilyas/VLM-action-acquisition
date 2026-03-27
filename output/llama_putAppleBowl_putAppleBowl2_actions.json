@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_description": "robot putting an apple in a bowl",
+  "source_video": "putAppleBowl_putAppleBowl2",
+  "processed_at": "2026-03-27T21:56:03.992321+00:00",
+  "total_frames": 231,
+  "duration_s": 7.7,
+  "action_sequence": [
+    {
+      "id": 0,
+      "segment_id": 0,
+      "action_core": "PICK_AND_PLACE",
+      "sub_action": "place",
+      "start_time_s": 0.0,
+      "end_time_s": 76.667,
+      "duration_s": 76.667,
+      "objects_involved": [
+        "apple",
+        "bowl"
+      ],
+      "contact_type": "grasp",
+      "spatial_relation": "above bowl",
+      "depth_context": "no specific depth information available due to no-data readings",
+      "confidence": 0.8,
+      "reasoning": "The task context mentions the robot putting an apple in a bowl, which suggests a pick-and-place action. Although the depth grid summaries show no-data for all frames, the objects involved (apple and bowl) can be inferred from the task context. The gripper/end-effector is likely grasping the apple to place it in the bowl, given the nature of the task."
+    }
+  ],
+  "summary": {
+    "total_actions": 1,
+    "action_counts": {
+      "PICK_AND_PLACE": 1
+    },
+    "mean_confidence": 0.8,
+    "coverage_s": 76.667,
+    "low_confidence_segments": []
+  }
+}
