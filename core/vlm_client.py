@@ -1,17 +1,3 @@
-"""
-VLM Client — Ollama Backend
-============================
-Sends keyframe bundles to an Ollama vision model and parses the response
-into AKG-grounded action records.
-
-Prompt Engineering follows the NVIDIA VLM Prompt Engineering Guide (2025):
-  - Structured system prompt with AKG ontology
-  - Multi-image input (one per keyframe in segment)
-  - Chain-of-thought reasoning before JSON output
-  - Few-shot examples for Action Core disambiguation
-  - Depth grid injected as additional context text
-"""
-
 import json
 import logging
 import re
@@ -161,44 +147,86 @@ def build_user_prompt(
 # ── Ollama API Client ─────────────────────────────────────────────────────────
 
 class OllamaVLMClient:
-    """
-    Thin wrapper around the Ollama /api/chat endpoint for vision models.
-    Compatible with OpenWebUI-hosted Ollama servers.
-    """
-
     def __init__(self, cfg: OllamaConfig):
         self.cfg = cfg
-        self.endpoint = f"{cfg.base_url.rstrip('/')}/api/chat"
+        self.endpoint = cfg.chat_endpoint
+        self.headers = {
+            "Authorization": cfg.auth_header(),  # Bearer sk-xxxx (API key) or email fallback
+            "Content-Type": "application/json",
+        }
+        auth_type = "API key" if cfg.api_key else "email (fallback)"
+        log.info(f"OpenWebUI client → {self.endpoint}  model={cfg.model}  auth={auth_type}")
+
+    def _build_messages(self, system_prompt: str, user_text: str, images_b64: list[str]) -> list[dict]:
+        fmt = getattr(self.cfg, "image_format", "content_parts")
+
+        if fmt == "ollama_images":
+            # Ollama-native format: images as plain base64 list, text as string
+            return [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": user_text,
+                    "images": images_b64,
+                }
+            ]
+        else:
+            # OpenAI content-parts format (default)
+            content_parts = []
+            for b64 in images_b64:
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+                })
+            content_parts.append({"type": "text", "text": user_text})
+            return [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content_parts},
+            ]
 
     def _call(self, messages: list[dict], retries: int = 2) -> str:
         payload = {
             "model": self.cfg.model,
             "messages": messages,
             "stream": False,
-            "options": {
-                "temperature": self.cfg.temperature,
-                "num_predict": self.cfg.max_tokens,
-            }
+            "temperature": self.cfg.temperature,
+            "max_tokens": self.cfg.max_tokens,
         }
+        last_exc = None
         for attempt in range(retries + 1):
             try:
                 resp = requests.post(
                     self.endpoint,
-                    json=payload,
-                    timeout=self.cfg.timeout
+                    headers=self.headers,
+                    data=json.dumps(payload),
+                    timeout=self.cfg.timeout,
                 )
+
+                # Always log server error body — crucial for debugging 400/422
+                if not resp.ok:
+                    log.error(
+                        f"Server returned {resp.status_code}. "
+                        f"Response body: {resp.text[:800]}"
+                    )
                 resp.raise_for_status()
-                data = resp.json()
-                return data["message"]["content"]
+
+                result = resp.json()
+                # OpenAI-compatible: choices[0].message.content
+                return result["choices"][0]["message"]["content"]
+
             except requests.exceptions.ConnectionError as e:
-                log.error(f"Ollama connection failed: {e}")
+                log.error(f"Cannot reach server at {self.endpoint}: {e}")
+                raise
+            except KeyError as e:
+                log.error(f"Unexpected response format (missing {e}): {resp.text[:300]}")
                 raise
             except Exception as e:
+                last_exc = e
                 if attempt < retries:
-                    log.warning(f"VLM call failed (attempt {attempt+1}): {e} — retrying…")
+                    log.warning(f"VLM call failed (attempt {attempt+1}/{retries}): {e} — retrying…")
                     time.sleep(2 ** attempt)
                 else:
-                    raise
+                    raise last_exc
 
     def query_segment(
         self,
@@ -207,29 +235,40 @@ class OllamaVLMClient:
         task_description: str,
         action_cfg: ActionConfig,
     ) -> str:
-        """
-        Send keyframe images + prompt to Ollama and return the raw response string.
-        """
         user_text = build_user_prompt(
             bundles, seg, task_description, action_cfg,
             n_few_shot=action_cfg.few_shot_examples
         )
+        images_b64 = [pil_to_base64(b.fused_pil) for b in bundles]
 
-        # Build images list (base64)
-        images = [pil_to_base64(b.fused_pil) for b in bundles]
+        messages = self._build_messages(SYSTEM_PROMPT, user_text, images_b64)
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": user_text,
-                "images": images,          # Ollama vision API format
-            }
-        ]
-
-        log.debug(f"Querying VLM for segment {seg.start_frame}–{seg.end_frame} "
-                  f"with {len(images)} image(s)")
+        log.info(f"  → Querying {self.cfg.model} | segment {seg.start_frame}–{seg.end_frame} "
+                 f"| {len(images_b64)} keyframe(s)")
         return self._call(messages)
+
+    def test_connection(self) -> bool:
+        try:
+            payload = {
+                "model": self.cfg.model,
+                "messages": [{"role": "user", "content": "Reply with the single word: OK"}],
+                "stream": False,
+                "max_tokens": 10,
+            }
+            resp = requests.post(
+                self.endpoint,
+                headers=self.headers,
+                data=json.dumps(payload),
+                timeout=15,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            reply = result["choices"][0]["message"]["content"].strip()
+            log.info(f"Connection test passed. Server replied: '{reply}'")
+            return True
+        except Exception as e:
+            log.error(f"Connection test FAILED: {e}")
+            return False
 
 
 # ── Response Parser ───────────────────────────────────────────────────────────
@@ -241,10 +280,6 @@ def parse_vlm_response(
     bundles: list[KeyframeBundle],
     action_cfg: ActionConfig,
 ) -> Optional[AKGAction]:
-    """
-    Parse the raw VLM string into an AKGAction.
-    Handles: clean JSON, JSON embedded in markdown fences, partial JSON.
-    """
     # Strip markdown fences if present
     cleaned = re.sub(r"```(?:json)?", "", raw).strip()
     # Find the first { ... } block
