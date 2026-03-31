@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_description": "robot putting an apple in a bowl",
+  "source_video": "putAppleBowl_putAppleBowl2",
+  "processed_at": "2026-03-31T12:39:19.256533+00:00",
+  "total_frames": 231,
+  "duration_s": 7.7,
+  "action_sequence": [
+    {
+      "id": 0,
+      "segment_id": 0,
+      "action_core": "PICK_AND_PLACE",
+      "sub_action": "place",
+      "start_time_s": 0.0,
+      "end_time_s": 76.667,
+      "duration_s": 76.667,
+      "objects_involved": [
+        "apple",
+        "bowl"
+      ],
+      "contact_type": "grasp",
+      "spatial_relation": "above bowl",
+      "depth_context": "gripper holding apple near bowl",
+      "confidence": 0.95,
+      "reasoning": "The task context explicitly states \"robot putting an apple in a bowl\". The keyframe shows the robot arm grasping the apple (gripper closed around it) and positioned above the blue bowl. The action involves moving the gripped apple from its initial location to the bowl, which aligns with PICK_AND_PLACE (grasping and placing at a new location). The depth data indicates proximity between the gripper (holding the apple) and the bowl, confirming the spatial relationship. No other action core fits as well: CUTTING requires a blade, POURING involves liquids, MIXING requires mixing, PREPARING is for peeling/washing, COOK_COOL involves heat/cooling. Confident due to explicit task context and visual evidence."
+    }
+  ],
+  "summary": {
+    "total_actions": 1,
+    "action_counts": {
+      "PICK_AND_PLACE": 1
+    },
+    "mean_confidence": 0.95,
+    "coverage_s": 76.667,
+    "low_confidence_segments": []
+  }
+}
