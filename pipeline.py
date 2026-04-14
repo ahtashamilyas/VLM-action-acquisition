@@ -58,7 +58,7 @@ def run_pipeline(
                          cfg.task_description, source_name, total_frames, fps_seen)
 
     # ── Stage 3: VLM Inference ──────────────────────────────────────────────
-    log.info("Stage 3/3: VLM inference (Ollama)…")
+    log.info("Stage 3/3: VLM action detection…")
     actions = []
 
     if dry_run:
@@ -67,16 +67,10 @@ def run_pipeline(
         for seg_id, seg in enumerate(segments):
             actions.append(AKGAction(
                 segment_id=seg_id,
-                action_core="PICK_AND_PLACE",
-                sub_action="[dry-run]",
+                action="[demo]",
                 start_time_s=bundles_by_seg[seg_id][0].timestamp_s if bundles_by_seg[seg_id] else 0.0,
                 end_time_s=bundles_by_seg[seg_id][-1].timestamp_s if bundles_by_seg[seg_id] else 1.0,
-                objects_involved=[],
-                contact_type="none",
-                spatial_relation="unknown",
-                depth_context="",
                 confidence=0.5,
-                reasoning="[dry-run mode — VLM not called]",
             ))
     else:
         client = OllamaVLMClient(cfg.ollama)
@@ -90,32 +84,11 @@ def run_pipeline(
                 action = parse_vlm_response(raw, seg, seg_id, bundles, cfg.action)
                 if action:
                     actions.append(action)
-                    log.info(f"    → {action.action_core} / {action.sub_action} "
-                             f"(conf={action.confidence:.2f})")
+                    log.info(f"    → {action.action} (conf={action.confidence:.2f})")
                 else:
                     log.warning(f"    → No valid action extracted for segment {seg_id}")
             except Exception as e:
                 log.error(f"    VLM error on segment {seg_id}: {e}")
-
-    # ── Stage 4: REFLECT Failure Analysis ──────────────────────────────────
-    failure_result = None
-    if not dry_run:
-        try:
-            from core.vlm_client import analyse_failure
-            all_bundles = []
-            for seg_id in range(len(segments)):
-                all_bundles.extend(bundles_by_seg.get(seg_id, []))
-            task_name = re.sub(r"[^a-zA-Z]", "", Path(source_name).stem.split("_")[0])
-            failure_result = analyse_failure(
-                client=OllamaVLMClient(cfg.ollama),
-                episode_id=source_name,
-                task_description=cfg.task_description,
-                task_name=task_name,
-                all_bundles=all_bundles,
-                n_keyframes=3,
-            )
-        except Exception as e:
-            log.error(f"Failure analysis error: {e}")
 
     # ── Output ──────────────────────────────────────────────────────────────
     out_path = os.path.join(
@@ -129,7 +102,6 @@ def run_pipeline(
         source_video=source_name,
         total_frames=total_frames,
         video_fps=fps_seen,
-        failure_analysis=failure_result,
     )
     print_summary(data)
     return data
