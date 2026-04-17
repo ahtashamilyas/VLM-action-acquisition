@@ -22,7 +22,6 @@
 22:35:52 [INFO] core.keyframe_extraction: Detected 1 action segments from 768 frames
 22:35:52 [INFO] pipeline:   Detected 1 action segments, 3 keyframes total
 22:35:52 [INFO] pipeline: Stage 3/3: VLM action detection…
-22:35:52 [INFO] core.vlm_client: OpenWebUI client → http://192.168.200.10:3000/api/chat/completions  model=openchat:7b  auth=API key
 22:35:52 [INFO] pipeline:   Querying VLM for segment 1/1 (frames 0–2301)…
 22:35:52 [INFO] core.vlm_client:   → Querying openchat:7b | segment 0–2301 | 3 keyframe(s)
 22:36:14 [INFO] pipeline:     → reach [0.00s–19.15s] (conf=1.00)
