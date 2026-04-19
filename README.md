@@ -1,41 +1,33 @@
-22:32:39 [INFO] data.reflect_loader: Found 1 episodes in /home/student/Desktop/reflect_pipeline/real_data
-22:32:39 [INFO] pipeline: Pipeline start — source: putAppleBowl_putAppleBowl2
-22:32:39 [INFO] pipeline: Stage 1/3: RGBD preprocessing & keyframe ingestion…
-22:32:39 [INFO] data.reflect_loader:   Zarr: 2304 color frames, shape=(720, 1280, 3), depth frames=2304
-22:32:52 [INFO] pipeline:   Ingested 50 frames…
-22:33:05 [INFO] pipeline:   Ingested 100 frames…
-22:33:17 [INFO] pipeline:   Ingested 150 frames…
-22:33:28 [INFO] pipeline:   Ingested 200 frames…
-22:33:40 [INFO] pipeline:   Ingested 250 frames…
-22:33:52 [INFO] pipeline:   Ingested 300 frames…
-22:34:04 [INFO] pipeline:   Ingested 350 frames…
-22:34:16 [INFO] pipeline:   Ingested 400 frames…
-22:34:28 [INFO] pipeline:   Ingested 450 frames…
-22:34:40 [INFO] pipeline:   Ingested 500 frames…
-22:34:52 [INFO] pipeline:   Ingested 550 frames…
-22:35:04 [INFO] pipeline:   Ingested 600 frames…
-22:35:16 [INFO] pipeline:   Ingested 650 frames…
-22:35:29 [INFO] pipeline:   Ingested 700 frames…
-22:35:46 [INFO] pipeline:   Ingested 750 frames…
-22:35:52 [INFO] pipeline:   Total frames: 768
-22:35:52 [INFO] pipeline: Stage 2/3: Action boundary detection & keyframe selection…
-22:35:52 [INFO] core.keyframe_extraction: Detected 1 action segments from 768 frames
-22:35:52 [INFO] pipeline:   Detected 1 action segments, 3 keyframes total
-22:35:52 [INFO] pipeline: Stage 3/3: VLM action detection…
-22:35:52 [INFO] pipeline:   Querying VLM for segment 1/1 (frames 0–2301)…
-22:35:52 [INFO] core.vlm_client:   → Querying openchat:7b | segment 0–2301 | 3 keyframe(s)
-22:36:14 [INFO] pipeline:     → reach [0.00s–19.15s] (conf=1.00)
-22:36:14 [INFO] pipeline:     → grasp [28.73s–57.50s] (conf=1.00)
-22:36:14 [INFO] pipeline:     → place [67.10s–76.70s] (conf=1.00)
-22:36:14 [INFO] core.action_serializer: Saved 3 actions → output/putAppleBowl_putAppleBowl2_actions.json
-  ── ACTION DETECTION RESULTS ──
-  Task      : robot putting an apple in a bowl
-  Source    : putAppleBowl_putAppleBowl2
-  Duration  : 25.6s
-  Actions   : 3
-  Mean conf : 1.00
-
-  [00]   0.00s →  19.15s  reach           (conf=1.00) ██████████
-  [01]  28.73s →  57.50s  grasp           (conf=1.00) ██████████
-  [02]  67.10s →  76.70s  place           (conf=1.00) ██████████
-============================================================
+# Robot Video Processing Pipeline
+## Step 1: Read the Video
+The robot recordings are stored in a special compressed format called **Zarr** (similar to a ZIP file for video frames).  
+Code is used to read these files frame by frame, extracting:
+- The **colour image**
+- The **depth image** (which shows how far away each object is)
+---
+## Step 2: Find the Interesting Moments
+Instead of sending every single frame to the AI (which would be very slow), the system detects moments when the robot pauses between actions.
+Examples:
+- The brief stop between **reaching** and **grasping**
+This is done by:
+- Measuring motion in each frame using **optical flow**
+These pauses act as **natural boundaries between actions**.
+---
+## Step 3: Ask the AI What is Happening
+A few representative frames from each action segment are sent to an AI model, along with a text description of the task.
+The AI:
+- Analyzes the images
+- Returns a label (e.g., `"grasp"` or `"place"`)
+- Provides a **confidence score**
+### Models Tested:
+- `openchat:7b`
+- `llama3.3`
+- `qwen3-vl` *(the only model capable of actually seeing the images)*
+---
+## Step 4: Save the Results
+All results are saved in a structured **JSON file**, a simple text format that is easy for other programs to read.
+### Example Output (Task: *Put apple in bowl*)
+The system correctly identified three actions:
+- **Reach** (0–19s)
+- **Grasp** (28–57s)
+- **Place** (67–76s)
