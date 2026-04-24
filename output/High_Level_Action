@@ -1,0 +1,43 @@
+{
+"task_description": "robot putting fruits into a bowl",
+"source_video": "putFruitsBowl_putFruitsBowl1",
+"duration_s": 197.0,
+"total_actions": 3,
+"actions": \[
+{
+"id": 0,
+"segment_id": 0,
+"action": "pick_and_place_strawberry",
+"start_time_s": 0.19,
+"end_time_s": 59.0,
+"duration_s": 58.81,
+"confidence": 1.0
+},
+{
+"id": 1,
+"segment_id": 1,
+"action": "pick_and_place_guava",
+"start_time_s": 85.0,
+"end_time_s": 129.0,
+"duration_s": 44.0,
+"confidence": 1.0
+},
+{
+"id": 2,
+"segment_id": 2,
+"action": "pick_and_place_carrot",
+"start_time_s": 160.0,
+"end_time_s": 192.0,
+"duration_s": 32.0,
+"confidence": 1.0
+}
+\],
+"summary": {
+"action_counts": {
+"pick_and_place_strawberry": 1,
+"pick_and_place_guava": 1,
+"pick_and_place_carrot": 1
+},
+"mean_confidence": 1.0
+}
+}
