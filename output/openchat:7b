@@ -1,0 +1,43 @@
+{
+  "task_description": "robot putting fruits into a bowl",
+  "source_video": "putFruitsBowl_putFruitsBowl1",
+  "duration_s": 19.8,
+  "total_actions": 3,
+  "actions": [
+    {
+      "id": 0,
+      "segment_id": 0,
+      "action": "reach",
+      "start_time_s": 0.0,
+      "end_time_s": 49.333,
+      "duration_s": 49.333,
+      "confidence": 1.0
+    },
+    {
+      "id": 1,
+      "segment_id": 1,
+      "action": "grasp",
+      "start_time_s": 74.0,
+      "end_time_s": 148.167,
+      "duration_s": 74.167,
+      "confidence": 1.0
+    },
+    {
+      "id": 2,
+      "segment_id": 2,
+      "action": "lift",
+      "start_time_s": 172.917,
+      "end_time_s": 197.667,
+      "duration_s": 24.75,
+      "confidence": 1.0
+    }
+  ],
+  "summary": {
+    "action_counts": {
+      "reach": 1,
+      "grasp": 1,
+      "lift": 1
+    },
+    "mean_confidence": 1.0
+  }
+}
