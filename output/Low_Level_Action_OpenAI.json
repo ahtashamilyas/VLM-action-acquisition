@@ -1,0 +1,88 @@
+{
+"task_description": "robot putting fruits into a bowl",
+"duration_s": 197.0,
+"total_actions": 9,
+"actions": \[
+{
+"id": 0,
+"action": "reach",
+"start_time_s": 0.19,
+"end_time_s": 21.0,
+"duration_s": 20.81,
+"confidence": 0.95
+},
+{
+"id": 1,
+"action": "grasp",
+"start_time_s": 21.0,
+"end_time_s": 30.0,
+"duration_s": 9.0,
+"confidence": 0.95
+},
+{
+"id": 2,
+"action": "place",
+"start_time_s": 30.0,
+"end_time_s": 59.0,
+"duration_s": 29.0,
+"confidence": 0.95
+},
+
+```
+{
+  "id": 3,
+  "action": "reach",
+  "start_time_s": 59.0,
+  "end_time_s": 85.0,
+  "duration_s": 26.0,
+  "confidence": 0.94
+},
+{
+  "id": 4,
+  "action": "grasp",
+  "start_time_s": 85.0,
+  "end_time_s": 100.0,
+  "duration_s": 15.0,
+  "confidence": 0.94
+},
+{
+  "id": 5,
+  "action": "place",
+  "start_time_s": 100.0,
+  "end_time_s": 129.0,
+  "duration_s": 29.0,
+  "confidence": 0.94
+},
+
+{
+  "id": 6,
+  "action": "reach",
+  "start_time_s": 129.0,
+  "end_time_s": 160.0,
+  "duration_s": 31.0,
+  "confidence": 0.93
+},
+{
+  "id": 7,
+  "action": "grasp",
+  "start_time_s": 160.0,
+  "end_time_s": 170.0,
+  "duration_s": 10.0,
+  "confidence": 0.93
+},
+{
+  "id": 8,
+  "action": "place",
+  "start_time_s": 170.0,
+  "end_time_s": 192.0,
+  "duration_s": 22.0,
+  "confidence": 0.93
+}
+```
+
+\],
+"summary": {
+"pattern": "reach → grasp → place (repeated 3 times)",
+"mean_confidence": 0.94
+}
+}
