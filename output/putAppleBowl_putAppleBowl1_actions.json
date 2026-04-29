@@ -1,0 +1,33 @@
+{
+  "task_description": "robot putting an apple in a bowl",
+  "source_video": "putAppleBowl_putAppleBowl1",
+  "duration_s": 14.0,
+  "total_actions": 2,
+  "actions": [
+    {
+      "id": 0,
+      "segment_id": 0,
+      "action": "grasp",
+      "start_time_s": 17.417,
+      "end_time_s": 52.333,
+      "duration_s": 34.916,
+      "confidence": 0.8
+    },
+    {
+      "id": 1,
+      "segment_id": 1,
+      "action": "insert_into_container",
+      "start_time_s": 61.083,
+      "end_time_s": 69.833,
+      "duration_s": 8.75,
+      "confidence": 1.0
+    }
+  ],
+  "summary": {
+    "action_counts": {
+      "grasp": 1,
+      "insert_into_container": 1
+    },
+    "mean_confidence": 0.9
+  }
+}
