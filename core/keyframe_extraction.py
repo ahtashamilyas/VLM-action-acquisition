@@ -1,18 +1,3 @@
-"""
-Keyframe Extraction Module
-===========================
-Detects action boundaries from RGBD video using optical-flow-based
-end-effector velocity estimation, then selects representative keyframes
-for each detected action segment.
-
-Algorithm (inspired by SeeDo, Wang et al. 2024):
-  1. Compute dense optical flow between consecutive frames.
-  2. Compute per-frame mean flow magnitude (proxy for motion velocity).
-  3. Detect velocity minima → action boundary candidates.
-  4. Filter boundaries by minimum inter-boundary gap.
-  5. Sample keyframes within each segment (start / mid / end).
-"""
-
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -188,9 +173,10 @@ class KeyframeExtractor:
     ):
         """Add one frame to the extractor's buffer."""
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        gray_small = cv2.resize(gray, (320, 240), interpolation=cv2.INTER_AREA)
 
         if self._prev_gray is not None:
-            vel = compute_optical_flow_magnitude(self._prev_gray, gray)
+            vel = compute_optical_flow_magnitude(self._prev_gray, gray_small)
             dc = compute_depth_change(self._prev_depth, depth, self.depth_scale)
         else:
             vel, dc = 0.0, 0.0
@@ -206,7 +192,7 @@ class KeyframeExtractor:
             "velocity": vel,
         })
 
-        self._prev_gray = gray
+        self._prev_gray = gray_small
         self._prev_depth = depth
 
     def finalize(self) -> list[ActionSegment]:
