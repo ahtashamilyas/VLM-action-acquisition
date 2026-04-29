@@ -44,14 +44,17 @@ FEW_SHOT_EXAMPLES = []  # Removed: not needed for simple action classification
 
 SYSTEM_PROMPT = """You are a robot action analyser.
 
-You observe keyframes from a robot video. Identify the low-level action being performed.
+You receive N keyframes (images) from a single video segment, labelled Frame 0, Frame 1, … Frame N-1.
+Each frame may show a DIFFERENT low-level action as the robot transitions through a motion.
 
-Possible actions: reach, pick, move, place, release, grasp, rotate, push, pull, pour, stir, cut
+Possible actions: reach, grasp, lift, move, align, orient, position_over_container, insert_into_container, place_on_object, release, drop, adjust, remove_obstacle
 
 RULES:
-1. Output ONLY valid JSON — no preamble, no markdown fences, no extra text.
-2. confidence must be a float between 0.0 and 1.0.
-3. If uncertain, use confidence < 0.5.
+1. Output ONLY a valid JSON array — one entry per frame — no preamble, no markdown fences, no extra text.
+2. Each entry must have exactly: "frame_idx" (int), "action" (str), "confidence" (float 0.0–1.0).
+3. Choose the action that best describes what the robot is doing IN THAT FRAME.
+4. If two consecutive frames show the same action, that is fine — repeat it.
+5. If uncertain about a frame, use confidence < 0.5.
 """
 
 
@@ -62,18 +65,26 @@ def build_user_prompt(
     cfg: ActionConfig,
     n_few_shot: int = 0,
 ) -> str:
-    """Build the user prompt for simple action detection."""
+    """Build the user prompt for per-keyframe action labelling."""
+    frame_lines = [
+        f"  Frame {i}: t={b.timestamp_s:.3f}s"
+        for i, b in enumerate(bundles)
+    ]
+    example_output = json.dumps(
+        [{"frame_idx": i, "action": "<action>", "confidence": 0.0} for i in range(len(bundles))],
+        indent=2,
+    )
     lines = [
         f"Task: {task_description}",
-        f"Segment time: {bundles[0].timestamp_s:.2f}s – {bundles[-1].timestamp_s:.2f}s",
+        f"Segment: {bundles[0].timestamp_s:.3f}s – {bundles[-1].timestamp_s:.3f}s",
         "",
-        "Analyse the keyframe images and identify the action being performed.",
+        "Keyframes (images are attached in order):",
+        *frame_lines,
         "",
-        "Output ONLY this JSON:",
-        json.dumps({
-            "action": "<action name>",
-            "confidence": 0.0
-        }, indent=2),
+        "Label each frame with the low-level action the robot is performing at that moment.",
+        "",
+        "Output ONLY this JSON array (one entry per frame):",
+        example_output,
     ]
     return "\n".join(lines)
 
