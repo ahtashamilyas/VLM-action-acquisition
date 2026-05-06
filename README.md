@@ -1,6 +1,6 @@
 <div align="center">
   <h1>VLM Action Acquisition</h1>
-  <a href="#"><img src="https://img.shields.io/badge/Paper-Coming_Soon-blue?style=for-the-badge&logo=arxiv" alt="Paper"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Paper-blue?style=for-the-badge&logo=arxiv" alt="Paper"></a>
 </div>
 
 ## 📖 Introduction
@@ -13,7 +13,7 @@ Install the required dependencies from `requirement.txt`:
 pip install -r requirement.txt
 ```
 
-## 🚀 Usage
+## Usage
 
 You can run the full extraction pipeline with the following command (replace the credentials with your own):
 
