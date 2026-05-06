@@ -1,11 +1,3 @@
-"""
-VLM Client — Ollama Backend
-============================
-Sends keyframe bundles to an Ollama vision model for low-level action detection.
-
-Returns the detected action and confidence score.
-"""
-
 import json
 import logging
 import re
@@ -92,19 +84,6 @@ def build_user_prompt(
 # ── Ollama API Client ─────────────────────────────────────────────────────────
 
 class OllamaVLMClient:
-    """
-    Client for the university OpenWebUI server.
-
-    Matches the API format from supervisor credentials:
-      - Endpoint : POST {base_url}/api/chat/completions   (OpenAI-compatible)
-      - Auth     : Authorization: <user_id>  (university email, no "Bearer" prefix)
-      - Images   : sent as OpenAI-style content parts inside the user message
-
-    Reference chatbot() function provided by supervisor:
-        headers = {'Authorization': user_id, 'Content-Type': 'application/json'}
-        data    = {"model": model, "messages": [{"role": "user", "content": query}]}
-    """
-
     def __init__(self, cfg: OllamaConfig):
         self.cfg = cfg
         self.endpoint = cfg.chat_endpoint
@@ -116,20 +95,9 @@ class OllamaVLMClient:
         log.info(f"OpenWebUI client → {self.endpoint}  model={cfg.model}  auth={auth_type}")
 
     def _build_messages(self, system_prompt: str, user_text: str, images_b64: list[str]) -> list[dict]:
-        """
-        Build messages for OpenWebUI /api/chat/completions.
-
-        Two formats tried in order (controlled by self.cfg.image_format):
-          "content_parts"  : OpenAI-style [{type:image_url,...},{type:text,...}]
-          "ollama_images"  : Ollama native  {"content": text, "images": [b64, ...]}
-
-        OpenWebUI generally accepts content_parts, but some model backends
-        (especially older llava via Ollama) need the native images field.
-        """
         fmt = getattr(self.cfg, "image_format", "content_parts")
 
         if fmt == "ollama_images":
-            # Ollama-native format: images as plain base64 list, text as string
             return [
                 {"role": "system", "content": system_prompt},
                 {
@@ -139,7 +107,6 @@ class OllamaVLMClient:
                 }
             ]
         else:
-            # OpenAI content-parts format (default)
             content_parts = []
             for b64 in images_b64:
                 content_parts.append({
@@ -153,7 +120,6 @@ class OllamaVLMClient:
             ]
 
     def _call(self, messages: list[dict], retries: int = 2) -> str:
-        """POST to the OpenWebUI /api/chat/completions endpoint."""
         payload = {
             "model": self.cfg.model,
             "messages": messages,
@@ -170,8 +136,6 @@ class OllamaVLMClient:
                     data=json.dumps(payload),
                     timeout=self.cfg.timeout,
                 )
-
-                # Always log server error body — crucial for debugging 400/422
                 if not resp.ok:
                     log.error(
                         f"Server returned {resp.status_code}. "
@@ -180,7 +144,6 @@ class OllamaVLMClient:
                 resp.raise_for_status()
 
                 result = resp.json()
-                # OpenAI-compatible: choices[0].message.content
                 return result["choices"][0]["message"]["content"]
 
             except requests.exceptions.ConnectionError as e:
@@ -204,27 +167,17 @@ class OllamaVLMClient:
         task_description: str,
         action_cfg: ActionConfig,
     ) -> str:
-        """
-        Send keyframe images + structured AKG prompt to OpenWebUI/Ollama.
-        Returns raw VLM response string.
-        """
         user_text = build_user_prompt(
             bundles, seg, task_description, action_cfg,
             n_few_shot=action_cfg.few_shot_examples
         )
         images_b64 = [pil_to_base64(b.fused_pil) for b in bundles]
-
         messages = self._build_messages(SYSTEM_PROMPT, user_text, images_b64)
-
         log.info(f"  → Querying {self.cfg.model} | segment {seg.start_frame}–{seg.end_frame} "
                  f"| {len(images_b64)} keyframe(s)")
         return self._call(messages)
 
     def test_connection(self) -> bool:
-        """
-        Quick connectivity test — sends a plain text message with no images.
-        Call this before running the full pipeline to verify credentials.
-        """
         try:
             payload = {
                 "model": self.cfg.model,
@@ -256,37 +209,99 @@ def parse_vlm_response(
     seg_id: int,
     bundles: list[KeyframeBundle],
     action_cfg: ActionConfig,
-) -> Optional[AKGAction]:
-    """Parse raw VLM response into AKGAction (simplified: action + confidence only)."""
-    # Strip markdown fences if present
+) -> list[AKGAction]:
     cleaned = re.sub(r"```(?:json)?", "", raw).strip()
-    # Find the first { ... } block
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if not match:
+    match = re.search(r"\[.*\]", cleaned, re.DOTALL)
+    if match:
+        try:
+            parsed = json.loads(match.group())
+        except json.JSONDecodeError:
+            parsed = None
+    else:
+        parsed = None
+    if parsed is None:
+        match_obj = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match_obj:
+            try:
+                obj = json.loads(match_obj.group())
+                parsed = [{"frame_idx": 0, "action": obj.get("action", "unknown"),
+                           "confidence": obj.get("confidence", 0.5)}]
+            except json.JSONDecodeError:
+                pass
+
+    if not parsed:
         log.warning(f"No JSON found in VLM response for segment {seg_id}: {raw[:200]}")
-        return None
+        return []
 
-    try:
-        parsed = json.loads(match.group())
-    except json.JSONDecodeError as e:
-        log.warning(f"JSON parse error for segment {seg_id}: {e}\nRaw: {raw[:300]}")
-        return None
+    # Build a timestamp-indexed lookup: frame_idx → KeyframeBundle
+    bundle_map = {b.frame_idx: b for b in bundles}
+    # Also support positional indexing if VLM uses 0,1,2 rather than real frame_idx
+    bundle_list = list(bundles)
 
-    action = str(parsed.get("action", "unknown")).lower().strip()
-    confidence = float(parsed.get("confidence", 0.5))
-    
-    if confidence < action_cfg.min_confidence:
-        log.info(f"Segment {seg_id}: confidence {confidence:.2f} below threshold — skipping")
-        return None
+    def _bundle_for(entry: dict, pos: int) -> KeyframeBundle:
+        fidx = entry.get("frame_idx", pos)
+        return bundle_map.get(fidx, bundle_list[min(pos, len(bundle_list) - 1)])
 
-    start_t = bundles[0].timestamp_s if bundles else 0.0
-    end_t = bundles[-1].timestamp_s if bundles else 0.0
+    # Collapse consecutive same-action runs → one AKGAction each
+    actions: list[AKGAction] = []
+    run_start_pos = 0
+    run_action = None
+    run_confidences: list[float] = []
 
-    return AKGAction(
-        segment_id=seg_id,
-        action=action,
-        start_time_s=start_t,
-        end_time_s=end_t,
-        confidence=confidence,
-        raw_vlm_response=raw,
-    )
+    def _flush_run(run_action, run_start_pos, run_end_pos, run_confidences, sub_id):
+        b_start = _bundle_for(parsed[run_start_pos], run_start_pos)
+        b_end   = _bundle_for(parsed[run_end_pos],   run_end_pos)
+        conf = sum(run_confidences) / len(run_confidences)
+        if conf < action_cfg.min_confidence:
+            log.info(f"Segment {seg_id} sub-action '{run_action}': "
+                     f"confidence {conf:.2f} below threshold — skipping")
+            return None
+        return AKGAction(
+            segment_id=seg_id * 100 + sub_id,   # unique id: seg*100 + sub-action index
+            action=run_action,
+            start_time_s=b_start.timestamp_s,
+            end_time_s=b_end.timestamp_s,
+            confidence=round(conf, 2),
+            raw_vlm_response=raw,
+        )
+
+    sub_id = 0
+    for pos, entry in enumerate(parsed):
+        action_name = str(entry.get("action", "unknown")).lower().strip()
+        confidence  = float(entry.get("confidence", 0.5))
+
+        if run_action is None:
+            run_action = action_name
+            run_start_pos = pos
+            run_confidences = [confidence]
+        elif action_name == run_action:
+            run_confidences.append(confidence)
+        else:
+            # flush previous run
+            result = _flush_run(run_action, run_start_pos, pos - 1, run_confidences, sub_id)
+            if result:
+                actions.append(result)
+                sub_id += 1
+            # start new run
+            run_action = action_name
+            run_start_pos = pos
+            run_confidences = [confidence]
+
+    # flush final run
+    if run_action is not None:
+        result = _flush_run(run_action, run_start_pos, len(parsed) - 1, run_confidences, sub_id)
+        if result:
+            actions.append(result)
+
+    # Fix zero-duration actions (start == end, i.e. single-keyframe runs).
+    # Extend each such action to the midpoint between its neighbours so the
+    # output intervals tile the full segment span with no gaps and no zeros.
+    for i, a in enumerate(actions):
+        if a.start_time_s < a.end_time_s:
+            continue  # already has a span — leave it alone
+        prev_end = actions[i - 1].end_time_s if i > 0 else bundles[0].timestamp_s
+        next_start = actions[i + 1].start_time_s if i < len(actions) - 1 else bundles[-1].timestamp_s
+        a.start_time_s = round((prev_end + a.start_time_s) / 2, 3)
+        a.end_time_s   = round((a.end_time_s + next_start) / 2, 3)
+
+    return actions
