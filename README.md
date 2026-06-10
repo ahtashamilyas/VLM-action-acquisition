@@ -7,10 +7,10 @@
 This project processes RGB-D robot trajectories and utilizes Vision-Language Models (VLMs) to extract and serialize structured action steps. The pipeline handles keyframe extraction, RGB-D preprocessing, and action generation via models like Qwen-VL.
 
 ### Four-Stage Pipeline Architecture
-![Four-stage pipeline architecture](./assets/pipeline_architecture.png)
+![Four-stage pipeline architecture](./data/pipeline_architecture.png)
 
 ### Optical-Flow Velocity Signal
-![Optical-flow velocity signal for putAppleBowl2](./assets/optical_flow_velocity.png)
+![Optical-flow velocity signal for putAppleBowl2](./data/optical_flow_velocity.png)
 
 ## ⚙️ Installation
 Install the required dependencies from `requirement.txt`:
