@@ -30,6 +30,3 @@ python pipeline.py \
   --api_key <your_api_key> \
   --model qwen3-vl:latest
 ```
-
-## 📄 Paper
-Paper link: *Coming soon!*
